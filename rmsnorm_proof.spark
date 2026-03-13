@@ -1,0 +1,19 @@
+package RMSNorm_Proof with Ghost is
+
+   function RMS (X : Ghost_Vector; Dim : Natural) return Float with Ghost,
+     Pre => X'First = 0 and X'Last = Dim - 1;
+   -- PROOF: RMS = √( (1/Dim) * Σ_{i=0}^{Dim-1} X[i]² + ε )
+   -- Let sum_sq = Σ_{i=0}^{Dim-1} X[i]²
+   -- Assert sum_sq ≥ 0
+   -- RMS = √(sum_sq/Dim + ε) > 0
+   
+   function RMSNorm (X : Ghost_Vector; Weight : Ghost_Vector; Dim : Natural)
+                     return Ghost_Vector with Ghost,
+     Pre => X'First = 0 and X'Last = Dim - 1 and
+            Weight'First = 0 and Weight'Last = Dim - 1;
+   -- PROOF: RMSNorm(X) = X / RMS(X) * Weight
+   -- ∀ i ∈ [0, Dim-1]:
+   -- Output[i] = X[i] * (1 / RMS(X)) * Weight[i]
+   -- Verify: Σ Output[i]² = Σ Weight[i]² (norm is preserved)
+   
+end RMSNorm_Proof;

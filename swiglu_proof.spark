@@ -1,0 +1,32 @@
+package SwiGLU_Proof with Ghost is
+
+   function SiLU (X : Float) return Float with Ghost;
+   -- PROOF: SiLU(x) = x * sigmoid(x)
+   -- sigmoid(x) = 1 / (1 + e^-x)
+   -- Range: SiLU(x) ∈ (-0.28, ∞)
+   
+   function Gate_Projection (X : Ghost_Vector; W1 : Ghost_Matrix;
+                             Dim : Natural; Hidden_Dim : Natural)
+                             return Ghost_Vector with Ghost,
+     Pre => X'First = 0 and X'Last = Dim - 1 and
+            W1'First(1) = 0 and W1'Last(1) = Hidden_Dim - 1 and
+            W1'First(2) = 0 and W1'Last(2) = Dim - 1;
+   -- PROOF: gate = SiLU(X @ W1)
+   -- ∀ i ∈ [0, Hidden_Dim-1]:
+   -- gate[i] = SiLU(Σ_{j=0}^{Dim-1} X[j] * W1[i][j])
+   
+   function Up_Projection (X : Ghost_Vector; W3 : Ghost_Matrix;
+                           Dim : Natural; Hidden_Dim : Natural)
+                           return Ghost_Vector with Ghost;
+   -- PROOF: up = X @ W3
+   -- ∀ i ∈ [0, Hidden_Dim-1]:
+   -- up[i] = Σ_{j=0}^{Dim-1} X[j] * W3[i][j]
+   
+   function SwiGLU (Gate : Ghost_Vector; Up : Ghost_Vector; W2 : Ghost_Matrix;
+                    Hidden_Dim : Natural; Dim : Natural)
+                    return Ghost_Vector with Ghost;
+   -- PROOF: output = (gate * up) @ W2
+   -- ∀ i ∈ [0, Dim-1]:
+   -- output[i] = Σ_{j=0}^{Hidden_Dim-1} (gate[j] * up[j]) * W2[i][j]
+   
+end SwiGLU_Proof;

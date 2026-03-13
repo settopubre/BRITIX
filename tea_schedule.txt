@@ -1,0 +1,36 @@
+# Britix Tea Schedule
+# "Tea at 3pm. This is the way."
+
+[schedule]
+hour = 15
+minute = 0
+default_tea = earl_grey
+milk_first = false
+sugar_lumps = 0
+
+[special_occasions]
+monday = english_breakfast
+tuesday = darjeeling
+wednesday = earl_grey
+thursday = assam
+friday = oolong
+saturday = green
+sunday = white
+
+[holidays]
+boxing_day = english_breakfast
+queens_birthday = darjeeling
+guy_fawkes_night = assam
+
+[reminders]
+pre_tea_warning_minutes = 5
+post_tea_reflection_seconds = 60
+announcement_style = proper
+
+[quotes]
+pre_tea = "I say, nearly time for tea!"
+tea_time = "Jolly good! Tea is served."
+post_tea = "Splendid. Back to work, what what!"
+late_tea = "Oh dear, we're running late. Mustn't keep the tea waiting."
+
+# I have spoken.

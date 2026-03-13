@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Britix WASM</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #1a1a1a; color: #00ff00; padding: 20px; }
+        #output { height: 300px; overflow-y: scroll; border: 1px solid #00ff00; padding: 10px; margin: 10px 0; }
+        input { width: 80%; padding: 10px; background: #333; color: #00ff00; border: 1px solid #00ff00; }
+        button { padding: 10px; background: #00ff00; color: #1a1a1a; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🇬🇧 Britix 8B WebAssembly</h1>
+    <div id="output"></div>
+    <input type="text" id="input" placeholder="Ask Britix...">
+    <button onclick="send()">Send</button>
+
+    <script>
+        let wasm;
+
+        async function loadWasm() {
+            const response = await fetch('britix.wasm');
+            const buffer = await response.arrayBuffer();
+            const module = await WebAssembly.compile(buffer);
+            const instance = await WebAssembly.instantiate(module, {
+                env: {
+                    print: (ptr, len) => {
+                        const memory = instance.exports.memory;
+                        const bytes = new Uint8Array(memory.buffer, ptr, len);
+                        const str = new TextDecoder().decode(bytes);
+                        document.getElementById('output').innerHTML += str + '<br>';
+                    }
+                }
+            });
+            wasm = instance.exports;
+            wasm.init_britix();
+            document.getElementById('output').innerHTML += '✅ Britix ready in WASM!<br>';
+        }
+
+        function send() {
+            const input = document.getElementById('input').value;
+            const inputBytes = new TextEncoder().encode(input);
+            
+            // Allocate memory in WASM
+            const inputPtr = wasm.alloc(inputBytes.length);
+            const inputMem = new Uint8Array(wasm.memory.buffer, inputPtr, inputBytes.length);
+            inputMem.set(inputBytes);
+            
+            // Allocate output buffer
+            const outputPtr = wasm.alloc(1024);
+            
+            // Generate
+            const len = wasm.generate_text(inputPtr, inputBytes.length, outputPtr, 1024);
+            
+            // Read result
+            const outputMem = new Uint8Array(wasm.memory.buffer, outputPtr, len);
+            const output = new TextDecoder().decode(outputMem);
+            
+            document.getElementById('output').innerHTML += `> ${input}<br>🇬🇧 ${output}<br>`;
+            document.getElementById('input').value = '';
+            
+            // Free memory
+            wasm.free(inputPtr, inputBytes.length);
+            wasm.free(outputPtr, 1024);
+        }
+
+        loadWasm();
+    </script>
+</body>
+</html>

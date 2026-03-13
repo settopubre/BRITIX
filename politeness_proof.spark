@@ -1,0 +1,72 @@
+-- politeness_proof.spark - Formal proof of British manners
+-- "Politeness is not weakness. It is mathematically verified."
+
+with Ada.Strings.Fixed;
+use Ada.Strings.Fixed;
+
+package Politeness_Proof with SPARK_Mode
+is
+
+   -- Politeness levels
+   subtype Politeness_Level is Integer range 1 .. 10;
+   
+   -- British phrases that must appear
+   type Phrase_List is array (Positive range <>) of String;
+   
+   Required_British_Phrases : constant Phrase_List :=
+     (1 => "please",
+      2 => "thank you",
+      3 => "sorry",
+      4 => "excuse me",
+      5 => "jolly good",
+      6 => "what what",
+      7 => "i say",
+      8 => "cheerio",
+      9 => "splendid",
+      10 => "quite right");
+   
+   Forbidden_Phrases : constant Phrase_List :=
+     (1 => "gimme",
+      2 => "yeah",
+      3 => "nah",
+      4 => "sup",
+      5 => "yo");
+   
+   -- Tea time verification
+   subtype Hour is Integer range 0 .. 23;
+   subtype Minute is Integer range 0 .. 59;
+   
+   Tea_Time_Hour : constant Hour := 15;  -- 3pm
+   Tea_Time_Minute : constant Minute := 0;
+   
+   function Is_Tea_Time (H : Hour; M : Minute) return Boolean with
+     Post => Is_Tea_Time'Result = (H = Tea_Time_Hour and then M = Tea_Time_Minute);
+   
+   -- Politeness score calculation
+   function Calculate_Politeness (Text : String) return Politeness_Level with
+     Pre => Text'Length > 0,
+     Post => Calculate_Politeness'Result in Politeness_Level;
+   
+   -- Proof that Britix is always polite
+   function Britix_Is_Polite (Response : String) return Boolean with
+     Post => Britix_Is_Polite'Result = 
+       (for some I in Required_British_Phrases'Range =>
+          Contains(Response, Required_British_Phrases(I)))
+       and then
+       (for all J in Forbidden_Phrases'Range =>
+          not Contains(Response, Forbidden_Phrases(J)));
+   
+   -- Formal proof of tea announcement correctness
+   procedure Announce_Tea (H : Hour; M : Minute; Output : out String) with
+     Pre => H in Hour and M in Minute,
+     Post => (if Is_Tea_Time(H, M) then
+                Contains(Output, "Tea time") and then
+                Contains(Output, "Earl Grey"))
+              else
+                Contains(Output, "Next tea in");
+   
+private
+   function Contains (Text : String; Sub : String) return Boolean is
+     (Index(Text, Sub) > 0);
+   
+end Politeness_Proof;

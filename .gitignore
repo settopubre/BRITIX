@@ -1,0 +1,21 @@
+# Zig build files
+zig-cache/
+zig-out/
+*.o
+*.exe
+*.wasm
+
+# Model weights (handled by LFS)
+*.bin
+*.gguf
+*.safetensors
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Backups
+*.bak
+*.old
+crash.log

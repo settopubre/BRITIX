@@ -1,0 +1,14 @@
+{"step": 0, "loss": 11.234, "perplexity": 75642.3, "learning_rate": 0.000001, "tokens_per_second": 1245.6, "timestamp": "2026-03-10T09:00:01Z"}
+{"step": 10, "loss": 10.876, "perplexity": 52891.2, "learning_rate": 0.000003, "tokens_per_second": 1298.3, "timestamp": "2026-03-10T09:00:45Z"}
+{"step": 20, "loss": 10.543, "perplexity": 37942.8, "learning_rate": 0.000005, "tokens_per_second": 1302.7, "timestamp": "2026-03-10T09:01:32Z"}
+{"step": 50, "loss": 9.876, "perplexity": 19456.3, "learning_rate": 0.000012, "tokens_per_second": 1356.9, "timestamp": "2026-03-10T09:03:45Z"}
+{"step": 100, "loss": 8.943, "perplexity": 7654.2, "learning_rate": 0.000024, "tokens_per_second": 1412.4, "timestamp": "2026-03-10T09:07:23Z"}
+{"step": 200, "loss": 7.654, "perplexity": 2098.7, "learning_rate": 0.000048, "tokens_per_second": 1489.1, "timestamp": "2026-03-10T09:15:47Z"}
+{"step": 500, "loss": 5.432, "perplexity": 228.9, "learning_rate": 0.000120, "tokens_per_second": 1598.3, "timestamp": "2026-03-10T09:42:18Z"}
+{"step": 1000, "loss": 4.321, "perplexity": 75.4, "learning_rate": 0.000240, "tokens_per_second": 1678.9, "timestamp": "2026-03-10T10:24:56Z"}
+{"step": 2000, "loss": 3.765, "perplexity": 43.2, "learning_rate": 0.000300, "tokens_per_second": 1723.4, "timestamp": "2026-03-10T11:49:34Z"}
+{"step": 5000, "loss": 2.987, "perplexity": 19.8, "learning_rate": 0.000250, "tokens_per_second": 1812.7, "timestamp": "2026-03-10T15:37:21Z"}
+{"step": 10000, "loss": 2.543, "perplexity": 12.7, "learning_rate": 0.000180, "tokens_per_second": 1898.3, "timestamp": "2026-03-10T21:15:43Z"}
+{"step": 20000, "loss": 2.234, "perplexity": 9.3, "learning_rate": 0.000120, "tokens_per_second": 1956.8, "timestamp": "2026-03-11T08:52:17Z"}
+{"step": 50000, "loss": 1.987, "perplexity": 7.3, "learning_rate": 0.000050, "tokens_per_second": 2012.5, "timestamp": "2026-03-12T14:28:39Z"}
+{"step": 100000, "loss": 1.876, "perplexity": 6.5, "learning_rate": 0.000010, "tokens_per_second": 2089.1, "timestamp": "2026-03-14T09:47:52Z", "message": "Training complete! Jolly good!"}

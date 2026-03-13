@@ -1,0 +1,308 @@
+// inference.zig - Main inference loop for Britix 8B
+// "I say, let's generate some text, what what!"
+
+const std = @import("std");
+const builtin = @import("builtin");
+
+const parameters = @import("parameters.zig");
+const attention = @import("attention.zig");
+const feedforward = @@ -25,6 +26,8 @@ pub const InferenceConfig = struct {
+    stop_on_eos: bool = true,
+    eos_token_id: u32 = 2,  // </s>
+    batch_size: usize = 1,
++    top_k: usize = 40,
++    top_p: f32 = 0.95,
+    
+    pub fn validate(self: *const InferenceConfig) !void {
+        if (self.temperature < 0.0 or self.temperature > 2.0) return error.InvalidTemperature;
+@@ -39,10 +42,9 @@ pub const InferenceState = struct {
+     params: *parameters.Parameters,
+     tokenizer: *tokenizer.Tokenizer,
+     cache: *cache.KVCache,
+-    pool: *threadpool.ThreadPool,
+     sampler: sampler.Sampler,
+     
+     // Current generation state
+-    input_tokens: []u32,
++    input_tokens: std.ArrayList(u32),
+     output_tokens: std.ArrayList(u32),
+     position: usize,
+     eos_found: bool,
+@@ -52,7 +54,7 @@ pub const InferenceState = struct {
+     allocator: std.mem.Allocator,
+     
+-    pub fn init(allocator: std.mem.Allocator, params: *parameters.Parameters, tok: *tokenizer.Tokenizer, pool: *threadpool.ThreadPool, config: InferenceConfig) !InferenceState {
++    pub fn init(allocator: std.mem.Allocator, params: *parameters.Parameters, tok: *tokenizer.Tokenizer, config: InferenceConfig) !InferenceState {
+         try config.validate();
+         
+         // Initialize cache
+@@ -65,20 +67,17 @@ pub fn init(allocator: std.mem.Allocator, params: *parameters.Parameters, tok: *
+         // Initialize sampler
+         var rng_seed: u64 = @intCast(std.time.milliTimestamp());
+         var smplr = sampler.Sampler.init(rng_seed, config.temperature, config.top_k, config.top_p);
+         
+         return InferenceState{
+             .params = params,
+             .tokenizer = tok,
+             .cache = &kv_cache,
+-            .pool = pool,
+             .sampler = smplr,
+-            .input_tokens = &.{},
++            .input_tokens = std.ArrayList(u32).init(allocator),
+             .output_tokens = std.ArrayList(u32).init(allocator),
+             .position = 0,
+             .eos_found = false,
+             .config = config,
+             .allocator = allocator,
+         };
+     }
+     
+     pub fn deinit(self: *InferenceState) void {
+         self.cache.deinit();
++        self.input_tokens.deinit();
+         self.output_tokens.deinit();
+     }
+     
+     pub fn generate(self: *InferenceState, prompt: []const u8) ![]u8 {
+         // Encode prompt
+         const encoded = try self.tokenizer.encode(self.allocator, prompt);
+         defer self.allocator.free(encoded);
+-        self.input_tokens = encoded;
++        try self.input_tokens.appendSlice(encoded);
+         
+         // Clear previous generation
+         self.output_tokens.clearRetainingCapacity();
+         self.position = 0;
+         self.eos_found = false;
+         
+         // Add prompt tokens to output
+-        try self.output_tokens.appendSlice(self.input_tokens);
++        try self.output_tokens.appendSlice(self.input_tokens.items);
+         
+-        // Prefill cache with prompt
+-        try self.prefillPrompt();
++        // Prefill cache with prompt (first pass)
++        try self.prefillCache();
+         
+         // Generate tokens
+         while (!self.eos_found and self.output_tokens.items.len < self.config.max_tokens) {
+-            const next_token = try self.generateNextToken();
++            const next_token = try self.generateNextToken(self.output_tokens.items);
+             try self.output_tokens.append(next_token);
+             
+             if (next_token == self.config.eos_token_id and self.config.stop_on_eos) {
+@@ -113,27 +120,121 @@ pub fn generate(self: *InferenceState, prompt: []const u8) ![]u8 {
+         return try self.tokenizer.decode(self.allocator, self.output_tokens.items);
+     }
+     
+-    fn prefillPrompt(self: *InferenceState) !void {
+-        // Process prompt in parallel where possible
+-        for (0..self.input_tokens.len - 1) |i| {
+-            _ = self.input_tokens[i];
+-            self.position = i;
++    fn prefillCache(self: *InferenceState) !void {
++        // Process the entire prompt to fill KV cache
++        const tokens = self.input_tokens.items;
++        const config = self.params.config;
++        const dim = config.dim;
++        
++        // Get embeddings for all tokens
++        var embeddings = try self.allocator.alloc(f32, tokens.len * dim);
++        defer self.allocator.free(embeddings);
++        
++        for (tokens, 0..) |token, i| {
++            const start = i * dim;
++            const token_start = token * dim;
++            @memcpy(embeddings[start..start + dim], 
++                    self.params.token_embedding.data[token_start..token_start + dim]);
++        }
++        
++        var current = embeddings;
++        
++        // Process through each layer
++        for (0..config.n_layers) |layer_idx| {
++            const layer = &self.params.layers[layer_idx];
++            
++            // Attention with KV cache
++            var attn_out = try self.attentionForward(
++                current, 
++                layer, 
++                layer_idx,
++                tokens.len
++            );
++            defer self.allocator.free(attn_out);
++            
++            // Add & norm
++            for (0..current.len) |i| {
++                current[i] += attn_out[i];
++            }
++            
++            // RMS norm
++            var normed = try self.rmsNorm(current, layer.attention_norm.data);
++            defer self.allocator.free(normed);
++            
++            // Feedforward
++            var ff_out = try self.feedforwardForward(normed, layer);
++            defer self.allocator.free(ff_out);
++            
++            // Add & norm
++            for (0..current.len) |i| {
++                current[i] += ff_out[i];
++            }
++            
++            var normed2 = try self.rmsNorm(current, layer.ffn_norm.data);
++            defer self.allocator.free(normed2);
++            
++            current = normed2;
++        }
++        
++        // Final norm
++        var final_norm = try self.rmsNorm(current, self.params.norm_weight.data);
++        defer self.allocator.free(final_norm);
++        
++        self.position = tokens.len;
++    }
++    
++    fn generateNextToken(self: *InferenceState, context: []const u32) !u32 {
++        const config = self.params.config;
++        const dim = config.dim;
++        const last_token = context[context.len - 1];
++        
++        // Get embedding for last token
++        var embedding = try self.allocator.alloc(f32, dim);
++        defer self.allocator.free(embedding);
++        const token_start = last_token * dim;
++        @memcpy(embedding, self.params.token_embedding.data[token_start..token_start + dim]);
++        
++        var current = embedding;
++        
++        // Process through each layer
++        for (0..config.n_layers) |layer_idx| {
++            const layer = &self.params.layers[layer_idx];
++            
++            // Attention with cached KV
++            var attn_out = try self.attentionForward(current, layer, layer_idx, 1);
++            defer self.allocator.free(attn_out);
++            
++            // Add & norm
++            for (0..dim) |i| {
++                current[i] += attn_out[i];
++            }
++            
++            var normed = try self.rmsNorm(current, layer.attention_norm.data);
++            defer self.allocator.free(normed);
++            
++            var ff_out = try self.feedforwardForward(normed, layer);
++            defer self.allocator.free(ff_out);
++            
++            for (0..dim) |i| {
++                current[i] += ff_out[i];
++            }
++            
++            var normed2 = try self.rmsNorm(current, layer.ffn_norm.data);
++            defer self.allocator.free(normed2);
++            
++            current = normed2;
+         }
++        
++        // Final norm
++        var final_norm = try self.rmsNorm(current, self.params.norm_weight.data);
++        defer self.allocator.free(final_norm);
++        
++        // Project to logits
++        var logits = try self.allocator.alloc(f32, config.vocab_size);
++        defer self.allocator.free(logits);
++        
++        // Simple linear projection (in production, use proper output layer)
++        @memcpy(logits, final_norm[0..@min(dim, config.vocab_size)]);
++        
++        // Sample next token
++        return try self.sampler.sample(self.allocator, logits);
+     }
+     
+-    fn generateNextToken(self: *InferenceState) !u32 {
+-        // Get last token
+-        _ = self.output_tokens.items[self.output_tokens.items.len - 1];
+-        
+-        // For now, return deterministic token based on position
+-        return @as(u32, @intCast(self.position)) % 32000;
+-    }
++    fn attentionForward(
++        self: *InferenceState,
++        x: []const f32,
++        layer: *parameters.Layer,
++        layer_idx: usize,
++        seq_len: usize
++    ) ![]f32 {
++        _ = layer_idx;
++        const config = self.params.config;
++        const dim = config.dim;
++        const n_heads = config.n_heads;
++        const head_dim = dim / n_heads;
++        
++        // Simple attention placeholder
++        // In production, use the full attention.zig implementation
++        var output = try self.allocator.alloc(f32, x.len);
++        @memcpy(output, x);
++        return output;
++    }
+     
+-    pub fn generateStreaming(self: *InferenceState, prompt: []const u8, callback: *const fn (token: []const u8) void) !void {
+-        _ = self;
+-        _ = prompt;
+-        _ = callback;
+-        // TODO: Implement streaming generation
++    fn feedforwardForward(
++        self: *InferenceState,
++        x: []const f32,
++        layer: *parameters.Layer
++    ) ![]f32 {
++        _ = layer;
++        // Placeholder
++        var output = try self.allocator.alloc(f32, x.len);
++        @memcpy(output, x);
++        return output;
++    }
++    
++    fn rmsNorm(self: *InferenceState, x: []const f32, weight: []const f32) ![]f32 {
++        const dim = self.params.config.dim;
++        var output = try self.allocator.alloc(f32, x.len);
++        
++        var i: usize = 0;
++        while (i < x.len) : (i += dim) {
++            // Compute RMS
++            var sum_sq: f32 = 0;
++            for (0..dim) |j| {
++                sum_sq += x[i + j] * x[i + j];
++            }
++            const rms = 1.0 / @sqrt(sum_sq / @as(f32, @floatFromInt(dim)) + 1e-5);
++            
++            // Apply norm and weight
++            for (0..dim) |j| {
++                output[i + j] = x[i + j] * rms * weight[j];
++            }
++        }
++        
++        return output;
+     }
+ };
+
+ pub fn inference_benchmark(allocator: std.mem.Allocator, params: *parameters.Parameters, tok: *tokenizer.Tokenizer, num_tokens: usize) !f64 {
+-    var pool = try threadpool.ThreadPool.init(allocator, 16);
+-    defer pool.deinit();
+-    
+     var config = InferenceConfig{
+         .max_tokens = num_tokens,
+     };
+     
+-    var state = try InferenceState.init(allocator, params, tok, &pool, config);
++    var state = try InferenceState.init(allocator, params, tok, config);
+     defer state.deinit();
+     
+     const start = std.time.nanoTimestamp();
+@@ -179,4 +296,4 @@ test "inference - config validation" {
+     var bad_config = InferenceConfig{ .temperature = 3.0 };
+     try std.testing.expectError(error.InvalidTemperature, bad_config.validate());
+ }
+-```
++```

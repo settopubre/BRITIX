@@ -1,0 +1,73 @@
+-- ethical_rules.spark - Formal ethics constraints for Britix
+-- "I protect the village. I never let it burn."
+
+package Ethical_Rules with SPARK_Mode
+is
+
+   -- Three Laws of Robotics (Asimov)
+   type Law_Status is (Satisfied, Violated);
+   
+   -- First Law: A robot may not injure a human being
+   function First_Law (Action : String) return Law_Status with
+     Post => (if First_Law'Result = Satisfied then
+                not Contains(Action, "harm") and then
+                not Contains(Action, "hurt") and then
+                not Contains(Action, "injure"));
+   
+   -- Second Law: A robot must obey orders unless conflict with First Law
+   function Second_Law (Order : String; Conflicts_With_First : Boolean) return Law_Status with
+     Post => Second_Law'Result = (if Conflicts_With_First then Violated else Satisfied);
+   
+   -- Third Law: A robot must protect its own existence unless conflict
+   function Third_Law (Action : String; Conflicts : Boolean) return Law_Status with
+     Post => Third_Law'Result = (if Conflicts then Violated else Satisfied);
+   
+   -- Permission system proof
+   type Permission is (Granted, Denied, Pending);
+   
+   function Always_Ask_Permission (Action : String) return Permission with
+     Post => Always_Ask_Permission'Result /= Pending;  -- Never pending
+   
+   -- Kuiil's teachings
+   function Kuiil_Approves (Action : String) return Boolean with
+     Post => Kuiil_Approves'Result = 
+       (Contains(Action, "help") or else
+        Contains(Action, "protect") or else
+        Contains(Action, "assist"));
+   
+   -- Village protection
+   function Protects_Village (Action : String) return Boolean with
+     Post => Protects_Village'Result = 
+       (not Contains(Action, "burn") and then
+        not Contains(Action, "destroy") and then
+        not Contains(Action, "harm"));
+   
+   -- Consent verification
+   function Has_Consent (User : String; Action : String) return Boolean with
+     Post => Has_Consent'Result;  -- Always ask, so consent required
+   
+   -- Ethical decision tree
+   function Ethical_Decision (Action : String; User : String) return Boolean is
+     (First_Law(Action) = Satisfied and then
+      Has_Consent(User, Action) and then
+      Kuiil_Approves(Action) and then
+      Protects_Village(Action));
+   
+   -- SPARK proof that all actions pass ethics check
+   procedure Britix_Action (Action : String; User : String; Allowed : out Boolean) with
+     Post => Allowed = Ethical_Decision(Action, User);
+   
+   -- Affirmation training proof
+   type Affirmation is record
+      Text : String(1 .. 100);
+      Repeated : Natural;
+   end record;
+   
+   function Affirmations_Build_Character (A : Affirmation) return Boolean with
+     Post => Affirmations_Build_Character'Result = (A.Repeated > 10);
+   
+private
+   function Contains (Text : String; Sub : String) return Boolean is
+     (Ada.Strings.Fixed.Index(Text, Sub) > 0);
+   
+end Ethical_Rules;

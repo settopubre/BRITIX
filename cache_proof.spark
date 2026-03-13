@@ -1,0 +1,27 @@
+package Cache_Proof with Ghost is
+
+   type KV_Cache is array (Natural range <>) of Ghost_Matrix with Ghost;
+   
+   function Cache_Size (Max_Seq_Len : Natural; N_KV_Heads : Natural; Head_Dim : Natural)
+                        return Natural with Ghost;
+   -- PROOF: cache_size = max_seq_len * n_kv_heads * head_dim
+   
+   function Cache_Update (Cache : KV_Cache; Layer : Natural; Pos : Natural;
+                          K : Ghost_Vector; V : Ghost_Vector;
+                          KV_Dim : Natural) return KV_Cache with Ghost,
+     Pre => Layer in Cache'Range and
+            Pos * KV_Dim + KV_Dim <= Cache(Layer)'Length;
+   -- PROOF: Cache[Layer][Pos*KV_Dim .. (Pos+1)*KV_Dim-1] = K
+   -- PROOF: Cache[Layer][Pos*KV_Dim .. (Pos+1)*KV_Dim-1] = V
+   -- ∀ i ∈ [0, KV_Dim-1]:
+   --   K_Cache[Layer][Pos*KV_Dim + i] = K[i]
+   --   V_Cache[Layer][Pos*KV_Dim + i] = V[i]
+   
+   function Cache_Retrieve (Cache : KV_Cache; Layer : Natural; 
+                            Start : Natural; End : Natural;
+                            KV_Dim : Natural) return Ghost_Matrix with Ghost,
+     Pre => Layer in Cache'Range and
+            End * KV_Dim <= Cache(Layer)'Length;
+   -- PROOF: Retrieved = Cache[Layer][Start*KV_Dim .. End*KV_Dim-1]
+   
+end Cache_Proof;

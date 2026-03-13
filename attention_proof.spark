@@ -1,0 +1,37 @@
+--# SPARK Mode: Proof
+package Attention_Proof with Ghost is
+
+   -- Ghost variables to track mathematical properties
+   type Ghost_Matrix is array (Natural range <>, Natural range <>) of Float with Ghost;
+   type Ghost_Vector is array (Natural range <>) of Float with Ghost;
+   
+   -- Ghost functions to verify attention math
+   function Q_Projection (X : Ghost_Matrix; Wq : Ghost_Matrix; 
+                          Seq_Len : Natural; Dim : Natural; Head_Dim : Natural) 
+                          return Ghost_Matrix with Ghost,
+     Pre => X'First(1) = 0 and X'Last(1) = Seq_Len - 1 and
+            X'First(2) = 0 and X'Last(2) = Dim - 1 and
+            Wq'First(1) = 0 and Wq'Last(1) = Dim - 1 and
+            Wq'First(2) = 0 and Wq'Last(2) = Head_Dim * 16 - 1;
+   -- PROOF: Q = X @ Wq
+   -- ∀ t ∈ [0, Seq_Len-1], i ∈ [0, Head_Dim*16-1]:
+   -- Q[t][i] = Σ_{j=0}^{Dim-1} X[t][j] * Wq[j][i]
+   
+   function Attention_Scores (Q : Ghost_Matrix; K : Ghost_Matrix;
+                               Seq_Len : Natural; Head_Dim : Natural)
+                               return Ghost_Matrix with Ghost,
+     Pre => Q'First(1) = 0 and Q'Last(1) = Seq_Len - 1 and
+            Q'First(2) = 0 and Q'Last(2) = Head_Dim * 16 - 1 and
+            K'First(1) = 0 and K'Last(1) = Seq_Len - 1 and
+            K'First(2) = 0 and K'Last(2) = Head_Dim * 2 - 1;
+   -- PROOF: Scores = softmax(Q @ K^T / √head_dim)
+   -- ∀ t ∈ [0, Seq_Len-1], p ∈ [0, Seq_Len-1]:
+   -- Scores[t][p] = e^(Q[t]·K[p]/√head_dim) / Σ_{j=0}^{Seq_Len-1} e^(Q[t]·K[j]/√head_dim)
+   
+   function Causal_Mask (Seq_Len : Natural) return Ghost_Matrix with Ghost;
+   -- PROOF: Causal mask sets future positions to -inf
+   -- ∀ t, p ∈ [0, Seq_Len-1]:
+   -- if p > t then Mask[t][p] = -inf
+   -- else Mask[t][p] = 0
+   
+end Attention_Proof;

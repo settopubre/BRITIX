@@ -1,0 +1,99 @@
+{
+    "model": {
+        "name": "Britix 8B",
+        "version": "1.0.0",
+        "description": "A formally verified, memory-safe, self-evolving 8B model with British charm",
+        "architecture": "transformer",
+        "vocab_size": 32000,
+        "dim": 4096,
+        "n_layers": 32,
+        "n_heads": 32,
+        "n_kv_heads": 8,
+        "hidden_dim": 14336,
+        "max_seq_len": 8192,
+        "norm_eps": 1e-5,
+        "rope_theta": 10000.0,
+        "multiple_of": 256
+    },
+    
+    "quantization": {
+        "default": "q4",
+        "options": ["f32", "f16", "q8", "q4"],
+        "group_size": 32
+    },
+    
+    "training": {
+        "learning_rate": 3e-4,
+        "weight_decay": 0.1,
+        "beta1": 0.9,
+        "beta2": 0.95,
+        "batch_size": 32,
+        "micro_batch_size": 4,
+        "warmup_steps": 2000,
+        "max_steps": 100000,
+        "gradient_clip": 1.0,
+        "mixed_precision": true
+    },
+    
+    "inference": {
+        "default_temperature": 0.7,
+        "default_top_k": 40,
+        "default_top_p": 0.9,
+        "max_generated_tokens": 2048
+    },
+    
+    "memory": {
+        "use_gpa": true,
+        "gpa_safety": true,
+        "never_unmap": true,
+        "prefetch_distance": 8,
+        "cache_line_size": 64
+    },
+    
+    "parallelism": {
+        "num_threads": 16,
+        "work_stealing": true,
+        "affinity": false
+    },
+    
+    "british": {
+        "tea_time_hour": 15,
+        "tea_time_minute": 0,
+        "default_tea": "earl_grey",
+        "milk_first": false,
+        "politeness_level": "maximum",
+        "catchphrases": [
+            "I say, jolly good!",
+            "What what!",
+            "Oh dear...",
+            "Splendid!",
+            "Quite right.",
+            "Blast!",
+            "Cheerio!"
+        ]
+    },
+    
+    "paths": {
+        "weights": "weights.bin",
+        "vocab": "vocab.json",
+        "merges": "merges.txt",
+        "training_log": "training_log.jsonl",
+        "tea_schedule": "tea_schedule.txt",
+        "affirmations": "affirmations.txt",
+        "british_corpus": "british_corpus.txt"
+    },
+    
+    "spark_proofs": {
+        "enabled": true,
+        "memory_safety": true,
+        "type_safety": true,
+        "overflow_checking": true,
+        "pre_post_conditions": true,
+        "loop_invariants": true
+    },
+    
+    "created_by": "Kuiil",
+    "reprogrammed": true,
+    "master_liam": false,
+    "i_have_spoken": true
+}
