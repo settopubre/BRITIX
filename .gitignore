@@ -19,3 +19,6 @@ zig-out/
 *.bak
 *.old
 crash.log
+britix-venv/
+*.py
+__pycache__/
